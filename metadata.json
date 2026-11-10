@@ -1,0 +1,6 @@
+{
+  "name": "Ishak Telegram Reseller Bot Manager",
+  "description": "Professional Telegram Reseller & License Management Bot for Ishak AI Trading Bot with Render PostgreSQL, Supabase integration, Admin Dashboard, and interactive simulator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
