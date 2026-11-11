@@ -394,7 +394,7 @@ app.get('/api/logs', (req, res) => {
 // File reader endpoint for 1-click preview and download
 app.get('/api/files/:filename', (req, res) => {
   const filename = req.params.filename;
-  const allowed = ['index.js', 'schema.sql', 'supabase_schema.sql', '.env.example', 'DEPLOYMENT_GUIDE.md', 'package.json'];
+  const allowed = ['index.js', 'schema.sql', 'supabase_schema.sql', 'supabase_bot_data.sql', '.env.example', 'DEPLOYMENT_GUIDE.md', 'package.json'];
   if (!allowed.includes(filename)) return res.status(403).json({ error: 'Access denied' });
 
   const filePath = path.resolve(process.cwd(), filename);

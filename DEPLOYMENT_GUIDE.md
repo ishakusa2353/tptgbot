@@ -1,7 +1,8 @@
-# 🚀 TradePilot Telegram Reseller Management Bot (v3.2)
-## GitHub Upload & Render Web Service Deployment Manual
+# 🚀 TradePilot Telegram Reseller Management Bot (v4.0)
+## Supabase Unified Data Storage & GitHub / Render Deployment Manual
 
 এই প্রজেক্টটি একটি একক ফাইল **`index.js`**-এর মাধ্যমে সরাসরি Render-এ Web Service হিসেবে হোস্ট করার জন্য সম্পূর্ণ প্রস্তুত।
+সমস্ত রিসেলার একাউন্ট, ব্যালেন্স, ডিপোজিট রিকোয়েস্ট ও সেটিংস Supabase-এর একক টেবিল **`ishak_bot_data`**-তে সংরক্ষিত থাকে।
 
 ---
 
@@ -14,31 +15,77 @@
 - **bKash Personal:** `01606398924`
 - **Binance Pay ID:** `827480681` (এডমিন প্যানেল থেকে পরিবর্তনযোগ্য)
 - **Supabase URL:** `https://qbazzarqiplrqqfytajz.supabase.co`
-- **Supabase Table:** `ishak_licenses` (Tier: **VIP**, Format: `TP-VIP-XXXX-XXXX-XXXX-XXXX`)
+- **Supabase License Table:** `ishak_licenses` (Tier: **VIP**, Format: `TP-VIP-XXXX-XXXX-XXXX-XXXX`)
+- **Supabase Bot Data Table:** `ishak_bot_data` (All Resellers, Balances, Deposits, Settings)
 
 ---
 
-### 🛡️ সর্বশেষ আপডেটেড ফিচারসমূহ (v3.2):
-1. **প্রথম মেসেজে Chat ID প্রদর্শন:**
-   - রিসেলার বা সাধারণ যেকোনো ইউজার `/start` দিলে প্রথম মেসেজেই তার **Chat ID** (যেমন: `🆔 Your Chat ID: 8274806813`) স্পষ্ট কোড আকারে প্রদর্শিত হয়, যাতে ইউজার এডমিনকে সহজে আইডি কপি করে পাঠাতে পারে।
-2. **লাইভ প্রোগ্রেস লোডিং ইন্টারফেস (12% ➔ 38% ➔ 68% ➔ 92% ➔ 100%):**
-   - লাইসেন্স জেনারেট বাটনে চাপার পর সাথে সাথে অ্যানিমেটেড লোডিং বার দেখায়, তারপর সম্পূর্ণ ডেলিভারি মেসেজ প্রস্তুত হয়।
-3. **লাইসেন্স ব্লক, আনব্লক ও ডিলিট অপশন:**
-   - রিসেলার `📜 My Licenses`-এ গেলে তার নিজের তৈরিকৃত প্রতিটি লাইসেন্সের পাশে **[ 🚫 Block ]** / **[ 🟢 Unblock ]** এবং **[ 🗑️ Delete ]** বাটন পাবে।
-   - নিয়ম অনুযায়ী রিসেলার তার লাইসেন্স সর্বোচ্চ **১ বার ব্লক** এবং **১ বার আনব্লক** করতে পারবে, এবং চাইলে চিরতরে **ডিলিট** করতে পারবে।
+### 🗄️ Supabase-এ `ishak_bot_data` টেবিল তৈরির SQL স্ক্রিপ্ট:
+নিচের কোডটি কপি করে আপনার [Supabase Dashboard](https://supabase.com/dashboard)-এ গিয়ে **SQL Editor**-এ পেস্ট করে **Run** করুন:
+
+```sql
+-- Create Unified Bot Data Table
+CREATE TABLE IF NOT EXISTS public.ishak_bot_data (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,                         -- 'reseller', 'deposit', 'settings'
+    telegram_id BIGINT,                         -- Telegram Chat/User ID
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,    -- Complete Data Payload
+    created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
+    updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
+);
+
+-- Fast lookup indexes
+CREATE INDEX IF NOT EXISTS idx_ishak_bot_data_type ON public.ishak_bot_data (type);
+CREATE INDEX IF NOT EXISTS idx_ishak_bot_data_tgid ON public.ishak_bot_data (telegram_id);
+
+-- Enable RLS and public access for Bot Anon Key
+ALTER TABLE public.ishak_bot_data ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all access on ishak_bot_data" ON public.ishak_bot_data;
+CREATE POLICY "Allow public all access on ishak_bot_data"
+ON public.ishak_bot_data FOR ALL TO public USING (true) WITH CHECK (true);
+
+-- Seed Initial Owner Reseller
+INSERT INTO public.ishak_bot_data (id, type, telegram_id, data)
+VALUES (
+    'reseller:8274806813',
+    'reseller',
+    8274806813,
+    '{"id": 1, "telegram_id": 8274806813, "username": "IshakVhai", "reseller_code": "TP-RSL-OWNER", "business_name": "Ishak Master Admin", "balance": 100000.0, "total_deposited": 100000.0, "total_licenses": 10, "status": "active"}'::jsonb
+) ON CONFLICT (id) DO NOTHING;
+
+-- Seed Initial Payment Settings
+INSERT INTO public.ishak_bot_data (id, type, telegram_id, data)
+VALUES (
+    'settings:payment',
+    'settings',
+    8274806813,
+    '{"bkash": "01606398924", "binancePayId": "827480681"}'::jsonb
+) ON CONFLICT (id) DO NOTHING;
+```
+
+---
+
+### 🛡️ সর্বশেষ আপডেটেড ফিচারসমূহ (v4.0):
+1. **সুপাবেজ অল-ইন-ওয়ান পারসিস্টেন্স (`ishak_bot_data`):**
+   - সার্ভার রিস্টার্ট বা রেন্ডার রিডিপ্লয় হলেও কোনো রিসেলার, ব্যালেন্স, ডিপোজিট ট্রানজেকশন বা সেটিংস মুছে যাবে না।
+2. **লাইসেন্স ব্লক, আনব্লক ও ডিলিট লাইভ অপশন:**
+   - ওনার ও রিসেলার `📜 My Licenses` এবং `🔑 License Manager`-এ গেলে সরাসরি প্রতিটি লাইসেন্সের পাশে **[ 🚫 Block ]** / **[ 🟢 Unblock ]** এবং **[ 🗑️ Delete ]** বাটন পাবেন।
+   - যেকোনো লাইসেন্স Key সার্চ করে তাৎক্ষণিক স্ট্যাটাস কার্ড দেখা ও অ্যাকশন নেওয়া যাবে।
+3. **ডিপোজিট রিজেকশন ইনস্ট্যান্ট নোটিফিকেশন:**
+   - এডমিন ডিপোজিট রিকোয়েস্ট রিজেক্ট (`❌ Reject`) করার সাথে সাথে রিসেলারের টেলিগ্রামে বিস্তারিত কারণসহ ইনস্ট্যান্ট নোটিফিকেশন যাবে এবং সরাসরি এডমিনের সাথে যোগাযোগের বাটন থাকবে।
 4. **১-ট্যাপ সম্পূর্ণ ডেলিভারি কপি ফরম্যাট:**
-   - লাইসেন্স ডেলিভারি মেসেজটি আলাদা `<pre>` কোডব্লকে থাকে, ফলে বক্সে একবার ট্যাপ করলেই শুধুমাত্র ক্লায়েন্টের ডেলিভারি টেক্সট কপি হয় (ব্যালেন্স বা বাড়তি লেখা ছাড়া)।
-5. **এডমিন প্যানেলে রিসেলার রিমুভ (`➖ Remove Reseller`):**
-   - এডমিন যেকোনো রিসেলারকে ১-ক্লিকে রিমুভ করে তার এক্সেস বাতিল করতে পারবেন।
-6. **ক্লিন লেআউট:**
-   - নিচের কিবোর্ডের বাটনগুলো মেসেজের উপরে ইনলাইন হিসেবে ডুপ্লিকেট করা হয় না।
+   - লাইসেন্স জেনারেট শেষে পুরো ডেলিভারি মেসেজটি আলাদা `<pre>` কোডব্লকে সংরক্ষিত থাকে।
+5. **লাইভ প্রোগ্রেস লোডিং ইন্টারফেস:**
+   - লাইসেন্স তৈরির সময় রিয়েলটাইম লোডিং বার (`12% -> 38% -> 68% -> 92% -> 100%`) প্রদর্শিত হয়।
+6. **প্রথম মেসেজে Chat ID প্রদর্শন:**
+   - ইউজার প্রথম `/start` করলেই তার Chat ID স্পষ্ট কোড আকারে প্রদর্শিত হয়।
 
 ---
 
 ### 📦 GitHub-এ আপলোড ও Render অটো-আপডেট:
 ```bash
-git add index.js package.json .env.example DEPLOYMENT_GUIDE.md
-git commit -m "Update TradePilot Reseller Bot v3.2 (Chat ID, Live Progress, Block/Delete)"
+git add index.js package.json supabase_bot_data.sql DEPLOYMENT_GUIDE.md
+git commit -m "Update TradePilot Reseller Bot v4.0 (Supabase ishak_bot_data, Block/Delete, Deposit Reject Notification)"
 git push origin main
 ```
-Render-এ Auto-Deploy চালু থাকলে কোড পুশ করামাত্র কয়েক সেকেন্ডের মধ্যে নতুন ফিচারগুলো লাইভ হয়ে যাবে!
+Render-এ Auto-Deploy চালু থাকলে কোড পুশ করার সাথে সাথে নতুন ফিচারগুলো কার্যকর হয়ে যাবে!

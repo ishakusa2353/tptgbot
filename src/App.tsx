@@ -116,7 +116,7 @@ export default function App() {
   const [newPkg, setNewPkg] = useState({ name: '', duration_days: 30, price_usd: 6, price_bdt: 750, description: '' });
 
   // Code viewer tab
-  const [selectedFile, setSelectedFile] = useState<'index.js' | 'schema.sql' | 'supabase_schema.sql' | '.env.example' | 'DEPLOYMENT_GUIDE.md'>('index.js');
+  const [selectedFile, setSelectedFile] = useState<'index.js' | 'schema.sql' | 'supabase_schema.sql' | 'supabase_bot_data.sql' | '.env.example' | 'DEPLOYMENT_GUIDE.md'>('index.js');
   const [fileContent, setFileContent] = useState<string>('');
 
   // Simulator State
@@ -1609,9 +1609,10 @@ CREATE TABLE IF NOT EXISTS ishak_licenses (
 
                 <div className="space-y-2">
                   {[
-                    { name: 'index.js', desc: 'মেইন টেলিগ্রাম বট এপ্লিকেশন (Node.js)' },
-                    { name: 'schema.sql', desc: 'Render PostgreSQL ডাটাবেজ স্ক্রিপ্ট' },
+                    { name: 'index.js', desc: 'মেইন টেলিগ্রাম বট এপ্লিকেশন (Node.js v4.0)' },
+                    { name: 'supabase_bot_data.sql', desc: 'Supabase ishak_bot_data টেবিল (All Bot Data)' },
                     { name: 'supabase_schema.sql', desc: 'Supabase ishak_licenses টেবিল' },
+                    { name: 'schema.sql', desc: 'Render PostgreSQL ডাটাবেজ স্ক্রিপ্ট' },
                     { name: '.env.example', desc: 'এনভায়রনমেন্ট ভেরিয়েবল টেমপ্লেট' },
                     { name: 'DEPLOYMENT_GUIDE.md', desc: 'সম্পূর্ণ ডিপ্লয়মেন্ট ম্যানুয়াল (বাংলা)' },
                   ].map((f) => (
