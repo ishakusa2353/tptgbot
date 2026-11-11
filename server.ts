@@ -426,7 +426,8 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Ishak Reseller Bot Web Studio running at http://localhost:${PORT}`);
-    // Telegram Bot Polling is disabled locally because it is live on Render
+    // Start Live Telegram Bot Polling Engine
+    startBotPolling();
   });
 }
 
