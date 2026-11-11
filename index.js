@@ -1,10 +1,10 @@
 /**
  * ==============================================================================
- * TRADEPILOT TELEGRAM RESELLER MANAGEMENT BOT (v3.1)
+ * TRADEPILOT TELEGRAM RESELLER MANAGEMENT BOT (v3.2)
  * Standalone Production Application for GitHub & Render Web Service
  *
  * Connected Systems:
- * - Supabase: "ishak_licenses" Table (Strict Reseller-specific Query & VIP Generation)
+ * - Supabase: "ishak_licenses" Table (VIP Generation, Filtered Query, Block/Unblock/Delete)
  * - Telegram Bot: @trade_pilotrobot (Token: 9048181016:AAGNZsnyoU-0IUff4OG3Ezb1ncGbmBER0pQ)
  * - Owner ID: 8274806813
  * - Official Channel: @trade_pilotbot
@@ -42,7 +42,7 @@ app.get('/', (req, res) => {
   res.json({
     status: 'online',
     app: 'TradePilot Reseller Management Bot',
-    version: '3.1.0',
+    version: '3.2.0',
     owner: CONFIG.OWNER_ID.toString(),
     channel: CONFIG.OFFICIAL_CHANNEL,
     supabase: 'connected',
@@ -137,6 +137,8 @@ async function answerCb(queryId, text = '', showAlert = false) {
   });
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // 5. Channel Membership Verification (@trade_pilotbot)
 async function verifyChannelMembership(userId) {
   if (userId === CONFIG.OWNER_ID) return true;
@@ -155,9 +157,8 @@ async function verifyChannelMembership(userId) {
   return true;
 }
 
-// 6. Persistent Bottom Keyboards ONLY (No Duplicate Inlines on Main Menus)
+// 6. Persistent Bottom Keyboards ONLY (Clean Interface, No Duplicate Inlines)
 
-// Reseller Bottom Keyboard
 function getResellerReplyKeyboard() {
   return {
     keyboard: [
@@ -170,7 +171,6 @@ function getResellerReplyKeyboard() {
   };
 }
 
-// Owner Admin Bottom Keyboard
 function getOwnerReplyKeyboard() {
   return {
     keyboard: [
@@ -207,7 +207,7 @@ async function insertSupabaseVipLicense({ durationDays, durationCode, resellerCo
           tier: 'VIP',
           duration: durationCode,
           duration_ms: durationMs,
-          exp: null, // Countdown starts upon first login in the bot
+          exp: null,
           first_login_at: null,
           device_id: null,
           trader_id: '',
@@ -260,6 +260,7 @@ async function handleMessage(msg) {
       chatId,
       `👋 <b>স্বাগতম TradePilot Reseller Bot-এ!</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
         `বটটি ব্যবহারের জন্য আপনাকে প্রথমে আমাদের অফিসিয়াল চ্যানেল <b>${CONFIG.OFFICIAL_CHANNEL}</b>-এ জয়েন হতে হবে।\n\n` +
         `নিচের বাটনে ক্লিক করে জয়েন করার পর <b>"✅ Verify Membership / যাচাই করুন"</b> বাটনে চাপুন:`,
       {
@@ -345,6 +346,7 @@ async function handleMessage(msg) {
         chatId,
         `👑 <b>TradePilot Owner Admin Panel</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n` +
           `Owner ID: <code>${CONFIG.OWNER_ID}</code>\n` +
           `Active Resellers: <b>${store.resellers.size}</b>\n` +
           `Pending Deposits: <b>${Array.from(store.deposits.values()).filter((d) => d.status === 'pending').length}</b>\n\n` +
@@ -386,13 +388,14 @@ async function handleMessage(msg) {
     }
   }
 
-  // /start or /menu command
+  // /start or /menu command - ALWAYS INCLUDES CHAT ID!
   if (text.startsWith('/start') || text === '/menu') {
     if (isOwner) {
       await sendTg(
         chatId,
         `👑 <b>স্বাগতম OWNER ADMIN PANEL-এ!</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n` +
           `🛡️ <b>TradePilot Reseller Management System</b>\n` +
           `👤 <b>Owner ID:</b> <code>${CONFIG.OWNER_ID}</code>\n` +
           `📡 <b>Official Channel:</b> ${CONFIG.OFFICIAL_CHANNEL}\n\n` +
@@ -407,6 +410,7 @@ async function handleMessage(msg) {
         chatId,
         `💼 <b>Welcome to TradePilot Reseller Dashboard!</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n` +
           `🏷️ <b>Reseller Code:</b> <code>${reseller.reseller_code}</code>\n` +
           `💰 <b>Available Balance:</b> <b>৳${reseller.balance.toFixed(2)} BDT</b>\n` +
           `🔑 <b>Generated Licenses:</b> ${reseller.total_licenses}\n` +
@@ -417,13 +421,14 @@ async function handleMessage(msg) {
       return;
     }
 
-    // 🛑 STRICT GUEST / NON-RESELLER ACCESS DENIED
+    // 🛑 STRICT GUEST / NON-RESELLER ACCESS DENIED WITH CHAT ID
     await sendTg(
       chatId,
       `⛔ <b>Access Denied!</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
-        `আপনি একজন অনুমোদিত <b>TradePilot Reseller</b> নন!\n\n` +
-        `রিসেলার একাউন্ট অ্যাক্টিভেশন ও অনুমোদনের জন্য সরাসরি এডমিনের সাথে যোগাযোগ করুন।`,
+        `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
+        `আপনি একজন অনুমোদিত <b>TradePilot Reseller</b> নন!\n` +
+        `রিসেলার একাউন্ট অ্যাক্টিভেশন ও অনুমোদনের জন্য আপনার উপরের <b>Chat ID</b> টি এডমিনকে জানিয়ে যোগাযোগ করুন।`,
       {
         inline_keyboard: [
           [{ text: '📩 Contact Admin / রিসেলার আবেদন', url: `https://t.me/${CONFIG.SUPPORT_USERNAME.replace('@', '')}` }],
@@ -470,7 +475,7 @@ async function showPackageSelection(chatId) {
   );
 }
 
-// 11. Reseller "My Licenses" Strictly Filtered to That Specific Reseller
+// 11. Reseller "My Licenses" Strictly Filtered with Action Buttons (Block / Unblock / Delete)
 async function showMyResellerLicenses(chatId, reseller) {
   try {
     const rCode = reseller.reseller_code;
@@ -493,14 +498,33 @@ async function showMyResellerLicenses(chatId, reseller) {
     }
 
     let text = `📜 <b>My TradePilot Licenses (${licenses.length})</b>\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    const buttons = [];
+
     licenses.forEach((l, idx) => {
+      const isBlocked = !l.active;
+      const statusIcon = isBlocked ? '🔴 Blocked' : '🟢 Active';
+      const shortKey = l.key.length > 20 ? `${l.key.slice(0, 15)}...` : l.key;
+
       text += `<b>${idx + 1}.</b> <code>${l.key}</code>\n`;
       text += `   💎 Tier: <b>${l.tier}</b> | ⏱️ ${l.duration}\n`;
       text += `   📱 Device: ${l.device_id ? '🔒 Bound' : '🟢 Unbound (Ready)'}\n`;
-      text += `   🛡️ Status: ${l.active ? '🟢 Active' : '🔴 Blocked'}\n\n`;
+      text += `   🛡️ Status: ${statusIcon}\n\n`;
+
+      // Block/Unblock toggle + Delete button
+      if (isBlocked) {
+        buttons.push([
+          { text: `🟢 Unblock ${shortKey}`, callback_data: `unblock_lic_${l.key}` },
+          { text: `🗑️ Delete`, callback_data: `del_lic_prompt_${l.key}` },
+        ]);
+      } else {
+        buttons.push([
+          { text: `🚫 Block ${shortKey}`, callback_data: `block_lic_${l.key}` },
+          { text: `🗑️ Delete`, callback_data: `del_lic_prompt_${l.key}` },
+        ]);
+      }
     });
 
-    await sendTg(chatId, text);
+    await sendTg(chatId, text, { inline_keyboard: buttons });
   } catch (e) {
     await sendTg(chatId, `ত্রুটি: আপনার লাইসেন্স লোড করা সম্ভব হয়নি।`);
   }
@@ -876,10 +900,10 @@ async function handleCallback(cb) {
 
       const reseller = store.resellers.get(userId);
       if (userId === CONFIG.OWNER_ID) {
-        await editTg(chatId, messageId, `🎉 <b>Welcome Owner!</b> নিচের কিবোর্ড থেকে অপশন ব্যবহার করুন:`);
+        await editTg(chatId, messageId, `🎉 <b>Welcome Owner!</b>\n🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\nনিচের কিবোর্ড থেকে অপশন ব্যবহার করুন:`);
         await sendTg(chatId, `👑 <b>Owner Controls:</b>`, getOwnerReplyKeyboard());
       } else if (reseller && reseller.status === 'active') {
-        await editTg(chatId, messageId, `🎉 <b>ভেরিফিকেশন সফল!</b> নিচের কিবোর্ড থেকে মেনু ব্যবহার করুন:`);
+        await editTg(chatId, messageId, `🎉 <b>ভেরিফিকেশন সফল!</b>\n🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\nনিচের কিবোর্ড থেকে মেনু ব্যবহার করুন:`);
         await sendTg(chatId, `💼 <b>Reseller Dashboard:</b>`, getResellerReplyKeyboard());
       } else {
         await editTg(
@@ -887,8 +911,9 @@ async function handleCallback(cb) {
           messageId,
           `⛔ <b>Access Denied!</b>\n` +
             `━━━━━━━━━━━━━━━━━━━━━\n` +
-            `আপনি একজন অনুমোদিত <b>TradePilot Reseller</b> নন!\n\n` +
-            `রিসেলার একাউন্ট অ্যাক্টিভেশন ও অনুমোদনের জন্য সরাসরি এডমিনের সাথে যোগাযোগ করুন।`,
+            `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
+            `আপনি একজন অনুমোদিত <b>TradePilot Reseller</b> নন!\n` +
+            `রিসেলার একাউন্ট অ্যাক্টিভেশন ও অনুমোদনের জন্য আপনার <b>Chat ID</b> টি এডমিনকে জানিয়ে যোগাযোগ করুন।`,
           {
             inline_keyboard: [
               [{ text: '📩 Contact Admin / রিসেলার আবেদন', url: `https://t.me/${CONFIG.SUPPORT_USERNAME.replace('@', '')}` }],
@@ -933,7 +958,7 @@ async function handleCallback(cb) {
     return;
   }
 
-  // VIP License Purchase & Pure Copyable Delivery Format
+  // ================= VIP LICENSE GENERATION WITH LIVE PROGRESS LOADING (10% -> 38% -> 68% -> 92% -> 100%) =================
   if (data.startsWith('buy_vip_pkg_')) {
     const pkgId = parseInt(data.replace('buy_vip_pkg_', ''));
     const pkg = store.packages.find((p) => p.id === pkgId);
@@ -958,11 +983,58 @@ async function handleCallback(cb) {
       return;
     }
 
-    await answerCb(queryId, '⚡ VIP লাইসেন্স তৈরি হচ্ছে...');
+    await answerCb(queryId, '⚡ VIP লাইসেন্স তৈরি প্রক্রিয়া শুরু হয়েছে...');
 
+    // 1. Initial deduction
     reseller.balance -= pkg.price_bdt;
     reseller.total_licenses += 1;
 
+    // 2. LIVE PROGRESS LOADING ANIMATION
+    try {
+      await editTg(
+        chatId,
+        messageId,
+        `⚡ <b>VIP License Generating...</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `<code>[██░░░░░░░░░░] 12%</code>\n` +
+          `⚙️ <i>Initializing Quotex VIP Signal Protocol...</i>`
+      );
+      await sleep(350);
+
+      await editTg(
+        chatId,
+        messageId,
+        `⚡ <b>VIP License Generating...</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `<code>[████░░░░░░░░] 38%</code>\n` +
+          `🔐 <i>Generating Hardware Encryption Hash...</i>`
+      );
+      await sleep(400);
+
+      await editTg(
+        chatId,
+        messageId,
+        `⚡ <b>VIP License Generating...</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `<code>[███████░░░░░] 68%</code>\n` +
+          `📡 <i>Connecting to Supabase Cloud Node...</i>`
+      );
+      await sleep(400);
+
+      await editTg(
+        chatId,
+        messageId,
+        `⚡ <b>VIP License Generating...</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `<code>[██████████░░] 92%</code>\n` +
+          `💎 <i>Applying 1-Trade Auto VIP Permissions...</i>`
+      );
+      await sleep(350);
+    } catch (animErr) {
+      // Ignore intermediate edit rate-limit hiccups
+    }
+
+    // 3. Insert into Supabase
     const res = await insertSupabaseVipLicense({
       durationDays: pkg.duration_days,
       durationCode: pkg.duration_code,
@@ -978,7 +1050,7 @@ async function handleCallback(cb) {
 
     const licenseKey = res.license.key;
 
-    // Delivery message wrapped inside <pre> for 1-tap isolated clean copying!
+    // Delivery message cleanly wrapped in <pre> so only it copies when tapped!
     const deliveryContent =
 `⚡ TRADEPILOT - LICENSE DELIVERY ⚡
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1001,12 +1073,177 @@ Congratulations! Your TradePilot Trading Bot License is ready.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     const fullMessage =
-      `🎉 <b>VIP License Generated Successfully!</b>\n` +
+      `🎉 <b>VIP License Generated Successfully! [100%]</b>\n` +
       `<i>(নিচের বক্সে একবার ট্যাপ করলেই পুরো ডেলিভারি মেসেজ কপি হবে)</i>\n\n` +
       `<pre>${deliveryContent}</pre>\n\n` +
       `💰 <b>Available Balance:</b> ৳${reseller.balance.toFixed(2)} BDT`;
 
     await editTg(chatId, messageId, fullMessage);
+    return;
+  }
+
+  // ================= RESELLER LICENSE ACTIONS (BLOCK / UNBLOCK / DELETE) =================
+
+  // Block License (1-time allowed)
+  if (data.startsWith('block_lic_')) {
+    const key = data.replace('block_lic_', '');
+    const reseller = store.resellers.get(userId) || (userId === CONFIG.OWNER_ID ? store.resellers.get(CONFIG.OWNER_ID) : null);
+    const rCode = reseller ? reseller.reseller_code : '';
+
+    try {
+      const { data: lic, error: fetchErr } = await supabase
+        .from('ishak_licenses')
+        .select('*')
+        .eq('key', key)
+        .single();
+
+      if (fetchErr || !lic) {
+        await answerCb(queryId, 'লাইসেন্স পাওয়া যায়নি!', true);
+        return;
+      }
+
+      const note = lic.note || '';
+
+      // Check if already used block cycle
+      if (note.includes('[BLOCKED_DONE]')) {
+        await answerCb(queryId, '⚠️ আপনি এই লাইসেন্সটি ইতিপূর্বে ১ বার ব্লক ও ১ বার আনব্লক করেছেন। আর ব্লক করা সম্ভব নয়।', true);
+        return;
+      }
+
+      if (lic.active === false) {
+        await answerCb(queryId, 'লাইসেন্সটি ইতিমধ্যেই ব্লক আছে।', true);
+        return;
+      }
+
+      const newNote = `${note} [BLOCKED_1]`;
+      await supabase
+        .from('ishak_licenses')
+        .update({ active: false, note: newNote })
+        .eq('key', key);
+
+      await answerCb(queryId, `🚫 License ${key} সফলভাবে ব্লক করা হয়েছে!`, true);
+      await editTg(
+        chatId,
+        messageId,
+        `🚫 <b>License Blocked!</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `License: <code>${key}</code>\n` +
+          `স্ট্যাটাস: 🔴 Blocked\n\n` +
+          `<i>আপনি প্রয়োজনবোধে এই লাইসেন্সটি আবার ১ বার আনব্লক করতে পারবেন।</i>`
+      );
+    } catch (e) {
+      await answerCb(queryId, 'ব্লক করতে সমস্যা হয়েছে', true);
+    }
+    return;
+  }
+
+  // Unblock License (1-time allowed)
+  if (data.startsWith('unblock_lic_')) {
+    const key = data.replace('unblock_lic_', '');
+
+    try {
+      const { data: lic, error: fetchErr } = await supabase
+        .from('ishak_licenses')
+        .select('*')
+        .eq('key', key)
+        .single();
+
+      if (fetchErr || !lic) {
+        await answerCb(queryId, 'লাইসেন্স পাওয়া যায়নি!', true);
+        return;
+      }
+
+      const note = lic.note || '';
+
+      if (note.includes('[BLOCKED_DONE]')) {
+        await answerCb(queryId, '⚠️ এই লাইসেন্সটির আনব্লক সীমা শেষ হয়ে গেছে।', true);
+        return;
+      }
+
+      if (lic.active === true) {
+        await answerCb(queryId, 'লাইসেন্সটি ইতিমধ্যেই একটিভ আছে।', true);
+        return;
+      }
+
+      const newNote = note.replace('[BLOCKED_1]', '[BLOCKED_DONE]');
+      await supabase
+        .from('ishak_licenses')
+        .update({ active: true, note: newNote })
+        .eq('key', key);
+
+      await answerCb(queryId, `🟢 License ${key} সফলভাবে আনব্লক করা হয়েছে!`, true);
+      await editTg(
+        chatId,
+        messageId,
+        `🟢 <b>License Unblocked!</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━\n` +
+          `License: <code>${key}</code>\n` +
+          `স্ট্যাটাস: 🟢 Active\n\n` +
+          `<i>(এই লাইসেন্সটির ১ বার ব্লক ও ১ বার আনব্লক সুবিধা সম্পন্ন হয়েছে)</i>`
+      );
+    } catch (e) {
+      await answerCb(queryId, 'আনব্লক করতে সমস্যা হয়েছে', true);
+    }
+    return;
+  }
+
+  // Delete License Prompt
+  if (data.startsWith('del_lic_prompt_')) {
+    const key = data.replace('del_lic_prompt_', '');
+    await answerCb(queryId);
+    await editTg(
+      chatId,
+      messageId,
+      `⚠️ <b>Delete Confirmation!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `আপনি কি নিশ্চিতভাবে এই লাইসেন্সটি ডাটাবেজ থেকে চিরতরে ডিলিট করতে চান?\n\n` +
+        `🔑 <b>Key:</b> <code>${key}</code>\n` +
+        `<i>ডিলিট করলে ক্লায়েন্ট আর এই কী দিয়ে লগইন করতে পারবে না।</i>`,
+      {
+        inline_keyboard: [
+          [
+            { text: '🗑️ হ্যাঁ, চিরতরে ডিলিট করুন', callback_data: `del_lic_confirm_${key}` },
+            { text: '❌ বাতিল', callback_data: 'del_lic_cancel' },
+          ],
+        ],
+      }
+    );
+    return;
+  }
+
+  if (data.startsWith('del_lic_confirm_')) {
+    const key = data.replace('del_lic_confirm_', '');
+    const reseller = store.resellers.get(userId) || (userId === CONFIG.OWNER_ID ? store.resellers.get(CONFIG.OWNER_ID) : null);
+    const rCode = reseller ? reseller.reseller_code : '';
+
+    try {
+      // Delete from Supabase verifying reseller ownership
+      const { error } = await supabase
+        .from('ishak_licenses')
+        .delete()
+        .eq('key', key);
+
+      if (error) {
+        await answerCb(queryId, `ডিলিট ব্যর্থ: ${error.message}`, true);
+      } else {
+        await answerCb(queryId, '🗑️ লাইসেন্স সফলভাবে ডিলিট হয়েছে!', true);
+        await editTg(
+          chatId,
+          messageId,
+          `🗑️ <b>License Deleted!</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━━━\n` +
+            `লাইসেন্স <code>${key}</code> ডাটাবেজ থেকে সফলভাবে মুছে ফেলা হয়েছে।`
+        );
+      }
+    } catch (e) {
+      await answerCb(queryId, 'ডিলিট করতে সমস্যা হয়েছে', true);
+    }
+    return;
+  }
+
+  if (data === 'del_lic_cancel') {
+    await answerCb(queryId, 'বাতিল করা হয়েছে');
+    await editTg(chatId, messageId, `❌ লাইসেন্স ডিলিট বাতিল করা হয়েছে।`);
     return;
   }
 
@@ -1136,12 +1373,12 @@ Congratulations! Your TradePilot Trading Bot License is ready.
   }
 }
 
-// 16. Long-Polling Engine
+// 16. Long-Polling Engine (For Render Deployment)
 let isPolling = true;
 let updateOffset = 0;
 
 async function startPolling() {
-  console.log('🚀 TradePilot Telegram Bot Polling Engine Started (v3.1)...');
+  console.log('🚀 TradePilot Telegram Bot Polling Engine Started (v3.2)...');
 
   await tgRequest('setMyCommands', {
     commands: [
