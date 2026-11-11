@@ -138,6 +138,8 @@ app.get('/api/stats', (req, res) => {
     totalDepositVolume,
     totalLicenses,
     botStatus: 'online',
+    host: 'Bots.Business (24/7 Cloud Webhook)',
+    botBusinessBotId: '3009407',
     officialChannel: '@trade_pilotbot',
     ownerId: '8274806813',
     supportUsername: '@IshakVhai',
@@ -426,8 +428,10 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Ishak Reseller Bot Web Studio running at http://localhost:${PORT}`);
-    // Start Live Telegram Bot Polling Engine
-    startBotPolling();
+    console.log(`🤖 Telegram Bot Host: Bots.Business 24/7 Cloud (Bot ID: 3009407)`);
+    if (process.env.RUN_LOCAL_BOT_POLLING === 'true') {
+      startBotPolling();
+    }
   });
 }
 
